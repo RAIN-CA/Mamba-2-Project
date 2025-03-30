@@ -1,0 +1,1 @@
+python main_lstm.py validate /root/autodl-tmp/ek55 models/ek55/RULSTM --modality rgb --task anticipation --sequence_completion

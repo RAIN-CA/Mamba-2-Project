@@ -1,0 +1,1 @@
+ python main_single_lstm.py train /root/autodl-tmp/EPIC55 models/ek55/SingleLSTM --alpha 1 --S_enc 8 --S_ant 20 --modality rgb --task anticipation --sequence_completion --display_every 20 --epochs 100 --lr 0.01 --num_workers 2

@@ -1,0 +1,1 @@
+python main.py train /root/autodl-tmp/ek55 /root/workplace/Mamba-2-Based-Egocentric-Video-Action-Anticipation-Project/rulstm2/RULSTM/models/ek55 --alpha 0.25 --S_enc 6 --S_ant 8 --modality rgb --task anticipation --sequence_completion --display_every 20  --epochs 100 --lr 0.01 --dropout 0.3 --batch_size 128 --num_workers 2
