@@ -854,6 +854,9 @@ class MambaTimeSeriesClassifier_V3(nn.Module):
         return y
 
 
+import torch
+import torch.nn as nn
+
 class MambaTimeSeriesClassifier_V3_5(nn.Module):
     def __init__(self, num_class, feat_in, hidden, dropout=0.8, return_context=False):
         super(MambaTimeSeriesClassifier_V3_5, self).__init__()
@@ -892,6 +895,8 @@ class MambaTimeSeriesClassifier_V3_5(nn.Module):
         self.feature_reduction = nn.Linear(512, 128)
 
         self.return_context = return_context
+        
+        self.latest_ssm_state = None
 
     @staticmethod
     def process_final_state(final_state):
@@ -910,7 +915,6 @@ class MambaTimeSeriesClassifier_V3_5(nn.Module):
         frame_features = []
         for t in range(inputs.size(1)):
             r1, r2, r3, r4 = region1[:, t, :, :], region2[:, t, :, :], region3[:, t, :, :], region4[:, t, :, :]
-
             _, f1 = self.mamba_region1(r1)
             _, f2 = self.mamba_region2(r2)
             _, f3 = self.mamba_region3(r3)
@@ -921,7 +925,7 @@ class MambaTimeSeriesClassifier_V3_5(nn.Module):
             f3_processed = self.process_final_state(f3)  # shape: [batch, 32, 128]
             f4_processed = self.process_final_state(f4)  # shape: [batch, 32, 128]
 
-            # 改为沿着 dim=2 拼接，得到 shape: [batch, 32, 512]
+            # 沿着 dim=2 拼接，得到 shape: [batch, 32, 512]
             frame_feature = torch.cat([f1_processed, f2_processed, f3_processed, f4_processed], dim=2)
             frame_features.append(frame_feature)
 
@@ -932,18 +936,22 @@ class MambaTimeSeriesClassifier_V3_5(nn.Module):
         # 通过降维层将 token 特征从 512 降至 128
         sequence_features = self.feature_reduction(sequence_features)
         
-        # 打印修改后的堆叠数据形状，便于调试
-        # print("Modified stacked sequence_features shape:", sequence_features.shape)
-
         _, final_state = self.mamba_sequence(sequence_features)
 
         aggregated_state = final_state.sum(dim=1)
         aggregated_state = aggregated_state.view(aggregated_state.size(0), -1)
 
+        # 保存最新的 SSM 状态用于对比学习（detach 避免保存计算图）
+        latest_ssm_state = aggregated_state.detach()
+
         y = self.classifier(aggregated_state)
         seqlen = inputs.size(1)
         y = y.unsqueeze(1).repeat(1, seqlen, 1)
         return y
+
+    def get_ssm_state(self):
+        return self.latest_ssm_state
+    
 
 class OpenMamba(nn.Module):
     """
