@@ -2,7 +2,7 @@
 from argparse import ArgumentParser
 from dataset import SequenceDataset
 from os.path import join
-from models import RUMambaTimeSeries, Mamba2Model, RMamba2TimeSeriesDirect, MambaTimeSeriesClassifier, MambaTimeSeriesClassifier_V2, RUMamba, MambaTimeSeriesClassifier_V3
+from models import RUMambaTimeSeries, Mamba2Model, RMamba2TimeSeriesDirect, MambaTimeSeriesClassifier, MambaTimeSeriesClassifier_V2, RUMamba, MambaTimeSeriesClassifier_V3, MambaTimeSeriesClassifier_V3_5
 import torch
 from torch.utils.data import DataLoader
 from torch.nn import functional as F
@@ -136,7 +136,7 @@ def get_loader(mode, override_modality = None):
 
 def get_model():
     if args.modality != 'fusion':  # single branch
-        model = MambaTimeSeriesClassifier_V3(args.num_class, args.feat_in, args.hidden,
+        model = MambaTimeSeriesClassifier_V3_5(args.num_class, args.feat_in, args.hidden,
                        args.dropout)
         # load checkpoint only if not in sequence completion mode
         # and inf the flag --ignore_checkpoints has not been specified
