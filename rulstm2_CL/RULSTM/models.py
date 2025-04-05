@@ -854,6 +854,97 @@ class MambaTimeSeriesClassifier_V3(nn.Module):
         return y
 
 
+class MambaTimeSeriesClassifier_V3_5(nn.Module):
+    def __init__(self, num_class, feat_in, hidden, dropout=0.8, return_context=False):
+        super(MambaTimeSeriesClassifier_V3_5, self).__init__()
+        self.feat_in = feat_in
+        self.hidden = hidden
+        self.dropout = nn.Dropout(dropout)
+
+        # 图像特征提取的 4 个 Mamba 模型
+        self.mamba_region1 = Mamba2Simple(d_model=192, d_state=128, d_conv=4, expand=4, headdim=32, chunk_size=256, use_mem_eff_path=False).to("cuda")
+        self.mamba_region2 = Mamba2Simple(d_model=192, d_state=128, d_conv=4, expand=4, headdim=32, chunk_size=256, use_mem_eff_path=False).to("cuda")
+        self.mamba_region3 = Mamba2Simple(d_model=192, d_state=128, d_conv=4, expand=4, headdim=32, chunk_size=256, use_mem_eff_path=False).to("cuda")
+        self.mamba_region4 = Mamba2Simple(d_model=192, d_state=128, d_conv=4, expand=4, headdim=32, chunk_size=256, use_mem_eff_path=False).to("cuda")
+
+        # 时序特征提取 Mamba 模型
+        self.mamba_sequence = Mamba2Simple(d_model=128, d_state=128, d_conv=4, expand=4, headdim=32, chunk_size=256, use_mem_eff_path=False).to("cuda")
+
+        self.temporal_encoding = TemporalPositionalEncoding(192)
+
+        headdim = 32
+        dstate = 128
+        feature_dim = headdim * dstate
+
+        # V3: 改进后的 decoder
+        self.classifier = nn.Sequential(
+            nn.LayerNorm(feature_dim),
+            nn.Linear(feature_dim, feature_dim * 2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(feature_dim * 2, feature_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(feature_dim, num_class)
+        )
+
+        # 添加降维层，将拼接后单帧特征的最后一维从 512 降至 128
+        self.feature_reduction = nn.Linear(512, 128)
+
+        self.return_context = return_context
+
+    @staticmethod
+    def process_final_state(final_state):
+        aggregated_state = final_state.sum(dim=1)
+        return aggregated_state
+
+    def forward(self, inputs):
+        inputs = inputs[:, :, 1:, :]
+        inputs = inputs.view(inputs.size(0), inputs.size(1), 14, 14, inputs.size(-1))
+
+        region1 = inputs[:, :, :7, :7, :].reshape(inputs.size(0), inputs.size(1), -1, inputs.size(-1))
+        region2 = inputs[:, :, :7, 7:, :].reshape(inputs.size(0), inputs.size(1), -1, inputs.size(-1))
+        region3 = inputs[:, :, 7:, :7, :].reshape(inputs.size(0), inputs.size(1), -1, inputs.size(-1))
+        region4 = inputs[:, :, 7:, 7:, :].reshape(inputs.size(0), inputs.size(1), -1, inputs.size(-1))
+
+        frame_features = []
+        for t in range(inputs.size(1)):
+            r1, r2, r3, r4 = region1[:, t, :, :], region2[:, t, :, :], region3[:, t, :, :], region4[:, t, :, :]
+
+            _, f1 = self.mamba_region1(r1)
+            _, f2 = self.mamba_region2(r2)
+            _, f3 = self.mamba_region3(r3)
+            _, f4 = self.mamba_region4(r4)
+
+            f1_processed = self.process_final_state(f1)  # shape: [batch, 32, 128]
+            f2_processed = self.process_final_state(f2)  # shape: [batch, 32, 128]
+            f3_processed = self.process_final_state(f3)  # shape: [batch, 32, 128]
+            f4_processed = self.process_final_state(f4)  # shape: [batch, 32, 128]
+
+            # 改为沿着 dim=2 拼接，得到 shape: [batch, 32, 512]
+            frame_feature = torch.cat([f1_processed, f2_processed, f3_processed, f4_processed], dim=2)
+            frame_features.append(frame_feature)
+
+        # 堆叠所有帧的特征，得到形状：[batch, seqlen, 32, 512]
+        sequence_features = torch.stack(frame_features, dim=1)
+        # 展开前两个维度，将每帧的 32 个 token 依次排列成时序数据，形状变为：[batch, seqlen*32, 512]
+        sequence_features = sequence_features.view(sequence_features.size(0), sequence_features.size(1) * sequence_features.size(2), -1)
+        # 通过降维层将 token 特征从 512 降至 128
+        sequence_features = self.feature_reduction(sequence_features)
+        
+        # 打印修改后的堆叠数据形状，便于调试
+        # print("Modified stacked sequence_features shape:", sequence_features.shape)
+
+        _, final_state = self.mamba_sequence(sequence_features)
+
+        aggregated_state = final_state.sum(dim=1)
+        aggregated_state = aggregated_state.view(aggregated_state.size(0), -1)
+
+        y = self.classifier(aggregated_state)
+        seqlen = inputs.size(1)
+        y = y.unsqueeze(1).repeat(1, seqlen, 1)
+        return y
+
 class OpenMamba(nn.Module):
     """
     An SSM implementation that returns the intermediate states for each time step.
