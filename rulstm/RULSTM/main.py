@@ -327,6 +327,24 @@ def trainval(model, loaders, optimizer, epochs, start_epoch, start_best_perf):
                     preds = model(x)
                     # print(f"preds shape: {preds.shape}")
                     
+                    
+                    # 统计所有参数（包括不可训练参数）的总数
+                    total_params = sum(p.numel() for p in model.parameters())
+
+                    # 如果只想统计可训练参数（requires_grad=True）
+                    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+                    print(f"Total parameters: {total_params:,}")
+                    print(f"Trainable parameters: {trainable_params:,}")
+
+                    # ——可选——
+                    # 如果你的权重是 float32，可以估算一下它们占用的内存：
+                    bytes_size = total_params * 4                # float32 每个参数 4 字节
+                    mb_size = bytes_size / 1024**2
+                    print(f"Approx. model size in memory: {mb_size:.2f} MB")
+                    
+                    
+                    
                     # print(f"x info: {x.shape}\ny info: {y.shape}\nbs info: {bs}\npreds info: {preds.shape}")
                     # print(f"#######################")
 

@@ -11,6 +11,8 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import json
+import os  # 用于创建文件夹
+
 pd.set_option('display.max_columns', None) # to show all columns in the table below
 pd.options.display.float_format = '{:05.2f}'.format
 
@@ -197,20 +199,47 @@ def save_model(model, epoch, perf, best_perf, is_best=False):
         visdom_saver.save()
 
 
+# def log(mode, epoch, loss_meter, accuracy_meter, best_perf=None, green=False):
+#     if green:
+#         print('\033[92m', end="")
+
+#     print(
+#         f"[{mode}] Epoch: {epoch:0.2f}. "
+#         f"Loss: {loss_meter.value():.2f}. "
+#         f"Accuracy: {accuracy_meter.value():.2f}% ", end="")
+
+#     if best_perf:
+#         print(f"[best: {best_perf:0.2f}]%", end="")
+
+#     print('\033[0m')
+
+#     if args.visdom:
+#         visdom_loss_logger.log(epoch, loss_meter.value(), name=mode)
+#         visdom_accuracy_logger.log(epoch, accuracy_meter.value(), name=mode)
+
 def log(mode, epoch, loss_meter, accuracy_meter, best_perf=None, green=False):
+    # ----------- 打印到控制台 -----------
     if green:
         print('\033[92m', end="")
 
-    print(
+    log_str = (
         f"[{mode}] Epoch: {epoch:0.2f}. "
         f"Loss: {loss_meter.value():.2f}. "
-        f"Accuracy: {accuracy_meter.value():.2f}% ", end="")
+        f"Accuracy: {accuracy_meter.value():.2f}% "
+    )
 
     if best_perf:
-        print(f"[best: {best_perf:0.2f}]%", end="")
+        log_str += f"[best: {best_perf:0.2f}]%"
 
-    print('\033[0m')
+    print(log_str + '\033[0m')
 
+    # ----------- 写入 log 文件 -----------
+    log_file_path = "/root/autodl-tmp/ek100/log/MambaTimeSeriesClassifier_V3_5/training_log_0.25_6_8.txt"  # <-- 你可以把路径修改为你希望硬编码的位置
+    os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+    with open(log_file_path, "a") as f:
+        f.write(log_str + "\n")
+
+    # ----------- Visdom 输出 -----------
     if args.visdom:
         visdom_loss_logger.log(epoch, loss_meter.value(), name=mode)
         visdom_accuracy_logger.log(epoch, accuracy_meter.value(), name=mode)
@@ -298,6 +327,7 @@ def trainval(model, loaders, optimizer, epochs, start_epoch, start_best_perf):
             accuracy_meter = {'training': MeanTopKRecallMeter(args.num_class), 'validation': MeanTopKRecallMeter(args.num_class)}
         else:
             accuracy_meter = {'training': ValueMeter(), 'validation': ValueMeter()}
+            # accuracy_meter = {'training': ValueMeter(), 'validation': MeanTopKRecallMeter(args.num_class)}
         for mode in ['training', 'validation']:
             # enable gradients only if training
             with torch.set_grad_enabled(mode == 'training'):

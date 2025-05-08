@@ -1,1 +1,2 @@
-python main.py train /root/autodl-tmp/ek100 /root/autodl-tmp/ek100/models/MambaTimeSeriesClassifier_V3_5 --num_class 3806 --alpha 0.25 --S_enc 6 --S_ant 8 --modality rgb --task anticipation --sequence_completion --display_every 50  --epochs 100 --lr 0.001 --dropout 0.6 --batch_size 128 --num_workers 2
+python main.py train /root/autodl-tmp/ek100 /root/autodl-tmp/ek100/models/MambaTimeSeriesClassifier_V3_5/CL --num_class 3806 --alpha 0.25 --S_enc 6 --S_ant 8 --modality rgb --task anticipation --sequence_completion --display_every 50  --epochs 100 --lr 0.01 --dropout 0.6 --batch_size 240 --num_workers 10 
+# --resume

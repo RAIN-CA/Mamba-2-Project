@@ -896,7 +896,7 @@ class MambaTimeSeriesClassifier_V3_5(nn.Module):
 
         self.return_context = return_context
         
-        self.latest_ssm_state = None
+        # self.latest_ssm_state = None
 
     @staticmethod
     def process_final_state(final_state):
@@ -940,9 +940,11 @@ class MambaTimeSeriesClassifier_V3_5(nn.Module):
 
         aggregated_state = final_state.sum(dim=1)
         aggregated_state = aggregated_state.view(aggregated_state.size(0), -1)
+        
+        # print("aggregated_state shape = ", aggregated_state.shape)
 
         # 保存最新的 SSM 状态用于对比学习（detach 避免保存计算图）
-        latest_ssm_state = aggregated_state.detach()
+        self.latest_ssm_state = aggregated_state.detach()
 
         y = self.classifier(aggregated_state)
         seqlen = inputs.size(1)

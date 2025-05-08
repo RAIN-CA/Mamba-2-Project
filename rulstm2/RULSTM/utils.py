@@ -13,16 +13,10 @@ class MeanTopKRecallMeter(object):
         self.nums = np.zeros(self.num_classes)
 
     def add(self, scores, labels):
-        # 取top-k预测，注意负号取倒序
-        topk_preds = np.argsort(-scores, axis=1)[:, :self.k]  
-
-        # 判断真实标签是否在top-k中
-        tp = np.array([label in pred for label, pred in zip(labels, topk_preds)], dtype=int)
-
-        # 按类别统计
+        tp = (np.argsort(scores, axis=1)[:, -self.k:] == labels.reshape(-1, 1)).max(1)
         for l in np.unique(labels):
-            self.tps[l] += tp[labels == l].sum()
-            self.nums[l] += (labels == l).sum()
+            self.tps[l]+=tp[labels==l].sum()
+            self.nums[l]+=(labels==l).sum()
 
     def value(self):
         recalls = (self.tps/self.nums)[self.nums>0]
@@ -30,6 +24,7 @@ class MeanTopKRecallMeter(object):
             return recalls.mean()*100
         else:
             return None
+        
 class ValueMeter(object):
     def __init__(self):
         self.sum = 0
